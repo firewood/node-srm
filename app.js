@@ -24,10 +24,11 @@ var cout = console.out = function() {
  */
 
 var express = require('express'),
-	routes = require('./routes'),
-	round = require('./round');
+	fs = require('fs');
 
 var app = module.exports = express.createServer();
+var config;
+var round;
 
 // Configuration
 
@@ -49,12 +50,39 @@ app.configure('production', function(){
 });
 
 // Routes
-
-app.get('/', routes.index);
+app.get('/', function(req, res) {
+	res.render('index', { title: 'Express' });
+});
 
 app.listen(3000);
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
 
-round.initialize(function(err, round_list) {
+fs.readFile('./config.json', 'utf8', function(err, content) {
+	try {
+		config = JSON.parse(content);
+	} catch (e) {
+		cout("config.json is not found or broken");
+		process.exit();
+	}
+
+	var lang;
+	switch (config['language']) {
+	case 'Java': case 'java':
+		lang = require('./java');
+		break;
+	case 'C#': case 'c#': case 'cs': case 'csharp':
+		lang = require('./csharp');
+		break;
+	case 'C++': case 'c++': case 'cpp': case 'cplusplus':
+		lang = require('./cpp');
+		break;
+	default:
+		cout("Please set valid language to config.json");
+		process.exit();
+		break;
+	}
+	config.lang = lang;
+
+	round = require('./round')({app:app, config:config});
 });
 
