@@ -51,7 +51,7 @@ app.configure('production', function(){
 
 // Routes
 app.get('/', function(req, res) {
-	res.render('index', { title: 'Express' });
+	res.render('index', { title: 'Node-SRM' });
 });
 
 app.listen(3000);
