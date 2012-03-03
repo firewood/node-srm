@@ -5,6 +5,8 @@ var url = require('url');
 var http = require('http');
 var https = require('https');
 var fs = require('fs');
+var os = require('os');
+var exec = require('child_process').exec;
 var querystring = require('querystring');
 var xml = require('./xml');
 
@@ -15,7 +17,7 @@ var problem_url = 'http://community.topcoder.com/stat?c=problem_statement';
 var round_list_filename = 'public/all_rounds.json';
 var srm_round_list_filename = 'public/srm_rounds.json';
 var srm_problem_list_filename = 'public/srm_problems.json';
-var srm_base_path = 'srm/';
+var srm_base_path = 'public/srm/';
 var statement_ext = '.html';
 var download_retries = 3;
 var srm_rounds = [];
@@ -183,10 +185,10 @@ function download_round_list(callback) {
 			var list = null;
 			if (!err) {
 				list = convert_round_list(nodes);
-				fs.writeFile(round_list_filename, JSON.stringify(list), function (err) { });
+				fs.writeFile(round_list_filename, JSON.stringify(list), function(err) { });
 				list = set_srm_round_list(list);
 				srm_rounds = list;
-				fs.writeFile(srm_round_list_filename, JSON.stringify(list), function (err) { });
+				fs.writeFile(srm_round_list_filename, JSON.stringify(list), function(err) { });
 
 				cout("number of SRM rounds: " + list.length);
 			}
@@ -304,7 +306,7 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 		download(target_url, null, function(err, content) {
 			if (!err) {
 				var statement = '<html><body>\n' + trim_statement(content.body) + '</body></html>\n';
-				fs.writeFile(path + statement_ext, statement, function (err) { });
+				fs.writeFile(path + statement_ext, statement, function(err) { });
 			}
 			callback(err, path);
 		});
@@ -322,8 +324,23 @@ function get_problem(req, res) {
 	}
 
 	download_srm_problem_statement(round_id, problem_id, function(err, path) {
-//		res.json({statusCode:err ? 0 : 1});
-		res.send(JSON.stringify({statusCode:err ? 0 : 1}));
+		if (err) {
+//			res.json({statusCode:0});
+			res.send(JSON.stringify({statusCode:0}));
+		} else {
+			var a = path.split('/');
+			a.shift();
+			path = a.join('/');
+//			res.json({statusCode:1, path:path});
+			res.send(JSON.stringify({statusCode:1, path:path}));
+
+			if (os.platform() == 'win32') {
+				// open folder on Windows
+				a.pop();
+				path = a.join('\\');
+				var child = exec('start ' + path);
+			}
+		}
 	});
 }
 
@@ -344,7 +361,7 @@ function get_round(req, res) {
 			if (!err && problems) {
 				cout("updating problem list...");
 				srm_problems[round] = problems;
-				fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems), function (err) { });
+				fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems), function(err) { });
 				res.json({statusCode:1, body:srm_problems[round]});
 			} else {
 				res.json({statusCode:0});
