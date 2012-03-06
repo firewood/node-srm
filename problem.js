@@ -36,7 +36,7 @@ function statement_to_code(path, statement, callback) {
 		}
 	});
 
-	fs.readFile('template/class' + ext(), 'utf8', function(err, content) {
+	fs.readFile('templates/class' + ext(), 'utf8', function(err, content) {
 		if (!err) {
 			content = content.replace('$CLASSNAME$', params['Class:'])
 				.replace('$METHODNAME$', params['Method:'])
