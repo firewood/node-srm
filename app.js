@@ -57,6 +57,19 @@ app.get('/', function(req, res) {
 app.listen(3000);
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
 
+var io = require('socket.io').listen(app);
+io.set('log level', 1);
+io.sockets.on('connection', function(socket) {
+	cout('CONNECTED');
+	socket.on('message', function(msg) {
+		//@@
+		cout('MSG', msg);
+	});
+	socket.on('disconnect', function() {
+		cout('DISCONNECTED');
+	});
+});
+
 fs.readFile('./config.json', 'utf8', function(err, content) {
 	try {
 		config = JSON.parse(content);

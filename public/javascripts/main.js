@@ -2,6 +2,7 @@
 // するめ
 
 var xhr;
+var socket;
 
 function console_log(msg) {
 	if (typeof console != 'undefined') {
@@ -141,6 +142,20 @@ $(function() {
 
 			}
 		}
+	});
+
+	socket = io.connect();
+	socket.on('connect', function() {
+		cout('CONNECTED');
+		socket.on('message', function (msg) {
+			cout(msg);
+		});
+
+		socket.emit('message', 'HELLO');
+
+	});
+	socket.on('disconnect', function() {
+		cout('DISCONNECTED');
 	});
 });
 
