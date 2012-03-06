@@ -77,6 +77,11 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 		process.exit();
 	}
 	config['language'] = language;
+
+	if (!config.hasOwnProperty('code_gen_path')) {
+		config['code_gen_path'] = 'public/srm';
+	}
+
 	round = require('./round')({app:app, config:config});
 });
 
