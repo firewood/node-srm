@@ -17,7 +17,6 @@ var problem_url = 'http://community.topcoder.com/stat?c=problem_statement';
 var round_list_filename = 'public/all_rounds.json';
 var srm_round_list_filename = 'public/srm_rounds.json';
 var srm_problem_list_filename = 'public/srm_problems.json';
-var srm_base_path = 'public/srm/';
 var statement_ext = '.html';
 var download_retries = 3;
 var srm_rounds = [];
@@ -56,7 +55,7 @@ function srm_problem_path(round, problem) {
 			}
 		}
 	}
-	return srm_base_path + round_path + '/';
+	return (config['code_gen_path'] + '/' + round_path + '/').replace('//', '/');
 }
 
 function url_strip_path(u) {
@@ -309,12 +308,12 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 		var target_url = problem_url + '&pm=' + problem_id + '&rd=' + round_id;
 		cout("url", target_url);
 
-		download(target_url, null, function(err, html) {
+		download(target_url, null, function(err, content) {
 			if (!err) {
 				var statement = '<html><body>\n' + trim_statement(content.body) + '</body></html>\n';
 				fs.writeFile(path + statement_ext, statement, function(err) { });
 			}
-			callback(err, {path:path, statement:html});
+			callback(err, {path:path, statement:content.body});
 		});
 	});
 }
