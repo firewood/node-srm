@@ -25,6 +25,7 @@ var srm_problems = {};
 
 var app;
 var config;
+var problem;
 var cookie;
 
 function mkdir(path) {
@@ -125,6 +126,11 @@ function try_download(count, target_url, post_data, callback) {
 				});
 			}
 		});
+	});
+	req.on('error', function(res) {
+		if (callback) {
+			callback(1, null);
+		}
 	});
 	if (post_data) {
 		req.write(post_data);
@@ -296,19 +302,19 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 
 	fs.readFile(path + statement_ext, 'utf8', function(err, html) {
 		if (!err) {
-			callback(null, path);
+			callback(null, {path:path, statement:html});
 			return;
 		}
 
 		var target_url = problem_url + '&pm=' + problem_id + '&rd=' + round_id;
 		cout("url", target_url);
 
-		download(target_url, null, function(err, content) {
+		download(target_url, null, function(err, html) {
 			if (!err) {
 				var statement = '<html><body>\n' + trim_statement(content.body) + '</body></html>\n';
 				fs.writeFile(path + statement_ext, statement, function(err) { });
 			}
-			callback(err, path);
+			callback(err, {path:path, statement:html});
 		});
 	});
 }
@@ -323,23 +329,38 @@ function get_problem(req, res) {
 		return;
 	}
 
-	download_srm_problem_statement(round_id, problem_id, function(err, path) {
+	download_srm_problem_statement(round_id, problem_id, function(err, data) {
 		if (err) {
 //			res.json({statusCode:0});
 			res.send(JSON.stringify({statusCode:0}));
 		} else {
+			var code_filename = data.path + problem.ext();
+			fs.readFile(code_filename, 'utf8', function(err, code) {
+				if (err) {
+					cout("generating code", code_filename);
+					problem.statement_to_code(code_filename, data.statement, function(err, content) {
+
+					
+					
+					});
+
+/*
+					if (os.platform() == 'win32') {
+						// open folder on Windows
+						a.pop();
+						path = a.join('\\');
+						var child = exec('start ' + path);
+					}
+*/
+				}
+			});
+
+			var path = data.path;
 			var a = path.split('/');
 			a.shift();
 			path = a.join('/');
 //			res.json({statusCode:1, path:path});
 			res.send(JSON.stringify({statusCode:1, path:path}));
-
-			if (os.platform() == 'win32') {
-				// open folder on Windows
-				a.pop();
-				path = a.join('\\');
-				var child = exec('start ' + path);
-			}
 		}
 	});
 }
@@ -373,6 +394,7 @@ function get_round(req, res) {
 module.exports = function(options) {
 	app = options.app;
 	config = options.config;
+	problem = require('./problem')(options);
 	cookie = '';
 
 	load_round_list(function(err, callback) {
