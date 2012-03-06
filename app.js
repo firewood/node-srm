@@ -65,24 +65,18 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 		process.exit();
 	}
 
-	var lang;
-	switch (config['language']) {
-	case 'Java': case 'java':
-		lang = require('./java');
-		break;
-	case 'C#': case 'c#': case 'cs': case 'csharp':
-		lang = require('./csharp');
-		break;
-	case 'C++': case 'c++': case 'cpp': case 'cplusplus':
-		lang = require('./cpp');
-		break;
-	default:
-		cout("Please set valid language to config.json");
+	var language = config['language'];
+	if (language.match(/java/i)) {
+		language = 'java';
+	} else if (language.match(/(c#|csharp)/i)) {
+		language = 'c#';
+	} else if (language.match(/(c\+\+|cpp|cplusplus)/i)) {
+		language = 'c++';
+	} else {
+		cout("Please set valid language in config.json either one of java/c#/c++.");
 		process.exit();
-		break;
 	}
-	config.lang = lang;
-
+	config['language'] = language;
 	round = require('./round')({app:app, config:config});
 });
 
