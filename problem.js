@@ -38,12 +38,16 @@ function statement_to_code(path, statement, callback) {
 
 	fs.readFile('templates/class' + ext(), 'utf8', function(err, content) {
 		if (!err) {
-			content = content.replace('$CLASSNAME$', params['Class:'])
-				.replace('$METHODNAME$', params['Method:'])
-				.replace('$METHODPARMS$', params['Parameters:'])
-				.replace('$WRITERCODE$', '')
-				.replace('$TESTCODE$', '');
-
+			var r = {CLASSNAME: 'Class:', METHODNAME: 'Method:', METHODPARMS: 'Parameters:',
+				RC: 'Returns:'};
+			content = content.replace(/\x24([A-Z]+)\x24/g, function(m, tag) {
+				if (r.hasOwnProperty(tag)) {
+					if (params.hasOwnProperty(r[tag])) {
+						return params[r[tag]];
+					}
+				}
+				return '';
+			});
 			fs.writeFile(path, content, function(err) { });
 		}
 		callback(err, content);
