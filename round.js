@@ -14,6 +14,8 @@ var top_url = 'https://community.topcoder.com/tc';
 var round_list_url = 'http://community.topcoder.com/tc?module=BasicData&c=dd_round_list';
 var round_overview_url = 'http://community.topcoder.com/stat?c=round_overview&er=0&rd=';
 var problem_url = 'http://community.topcoder.com/stat?c=problem_statement';
+var problem_detail_url = 'http://community.topcoder.com/tc?module=ProblemDetail';
+var problem_solution_url = 'http://community.topcoder.com/stat?c=problem_solution';
 var round_list_filename = 'public/all_rounds.json';
 var srm_round_list_filename = 'public/srm_rounds.json';
 var srm_problem_list_filename = 'public/srm_problems.json';
@@ -105,7 +107,8 @@ function try_download(count, target_url, post_data, callback) {
 	}
 	var content = '';
 	var req = protocol.request(options, function(res) {
-		res.setEncoding('utf-8');
+//		res.setEncoding('utf-8');
+		res.setEncoding('binary');
 		if (res.headers['set-cookie']) {
 			cookie = res.headers['set-cookie'];
 			cout("set cookie", cookie);
@@ -315,6 +318,33 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 				fs.writeFile(path + statement_ext, statement, function(err) { });
 			}
 			callback(err, {path:path, statement:content.body, index:i});
+
+
+			target_url = problem_detail_url + '&pm=' + problem_id + '&rd=' + round_id;
+			download(target_url, null, function(err, content) {
+				if (!err && content) {
+					if (content.body.match(/problem_solution[&;a-z]+cr=(\d+)[&;=\w]+"/)) {
+						var cr = RegExp.$1;
+						target_url = problem_solution_url + '&cr=' + cr + '&rd=' + round_id + '&pm=' + problem_id;
+						download(target_url, null, function(err, content) {
+							if (!err && content) {
+								var c = content.body.split('</TR>').filter(function(element, index, array) {
+									return element.match(/>Passed</);
+								}).map(function(val) {
+									return val.split('</TD>').filter(function(element, index, array) {
+										return element.match(/statText/);
+									}).map(function(val) {
+										return val.replace(/\n/g, '').replace(/^.*>/, '');
+									}).slice(0, 2);
+								});
+								fs.writeFile(path + '.json', JSON.stringify(c), function(err) { });
+							}
+						});
+					}
+				}
+			});
+
+
 		});
 	});
 }
