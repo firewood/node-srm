@@ -13,7 +13,7 @@ function refresh_logs() {
 
 function add_log(msg) {
 	if (logs.length >= log_lines) {
-		logs.pop();
+		logs.shift();
 	}
 	logs.push(msg);
 	refresh_logs();
@@ -160,18 +160,17 @@ $(function() {
 		}
 	});
 
+	var callback = function(msg) {
+		cout('R:' + msg);
+	};
 	socket = io.connect();
 	socket.on('connect', function() {
 		cout('CONNECTED');
-		socket.on('message', function (msg) {
-			cout(msg);
-		});
-
-		socket.emit('message', 'HELLO');
-
+		socket.on('message', callback);
 	});
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
+		socket.removeListener('message', callback);
 	});
 });
 
