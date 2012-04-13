@@ -24,6 +24,7 @@ var srm_problems = {};
 
 var app;
 var config;
+var watcher;
 var problem;
 var cookie;
 
@@ -384,6 +385,8 @@ function get_problem(req, res) {
 			path = a.join('/');
 //			res.json({statusCode:1, path:path});
 			res.send(JSON.stringify({statusCode:1, path:path}));
+
+			setTimeout(function() { watcher.watch(code_filename); }, 100);
 		}
 	});
 }
@@ -391,6 +394,7 @@ function get_problem(req, res) {
 module.exports = function(options) {
 	app = options.app;
 	config = options.config;
+	watcher = options.watcher;
 	problem = require('./problem')(options);
 	cookie = '';
 

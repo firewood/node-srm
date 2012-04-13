@@ -24,11 +24,36 @@ var cout = console.out = function() {
  */
 
 var express = require('express'),
-	fs = require('fs');
+	events = require('events'),
+	fs = require('fs'),
+	util = require("util");
 
 var app = module.exports = express.createServer();
 var config;
 var round;
+
+function Watcher() {
+	this.interval = 1000;
+	events.EventEmitter.call(this);
+}
+util.inherits(Watcher, events.EventEmitter);
+Watcher.prototype.watch = function(file) {
+	cout("watch: " + file);
+
+	if (this.w) {
+		this.w.close();
+		this.f = this.w = undefined;
+	}
+	var self = this;
+	this.f = file;
+	this.w = fs.watch(file, function(ev, filename) {
+		if (!self.b) {
+			self.b = true;
+			setTimeout(function() { self.emit('modified', file); self.b = false; }, 100);
+		}
+	});
+};
+var watcher = new Watcher();
 
 // Configuration
 
@@ -61,12 +86,19 @@ var io = require('socket.io').listen(app);
 io.set('log level', 1);
 io.sockets.on('connection', function(socket) {
 	cout('CONNECTED');
+	var callback = function(msg) {
+		socket.emit('message', msg);
+	};
+	watcher.on('message', callback);
+
 	socket.on('message', function(msg) {
 		//@@
 		cout('MSG', msg);
 	});
+
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
+		watcher.removeListener('message', callback);
 	});
 });
 
@@ -95,10 +127,15 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 		config['code_gen_path'] = 'public/srm';
 	}
 
-	round = require('./round')({app:app, config:config});
+	round = require('./round')({app:app, config:config, watcher:watcher});
 });
 
 process.on('uncaughtException', function(err) {
 	cout('uncaught Exception', err);
+	console.dir(err);
+});
+
+watcher.on('modified', function(file) {
+	cout('modified', file);
 });
 
