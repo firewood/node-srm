@@ -26,6 +26,7 @@ var cout = console.out = function() {
 var express = require('express'),
 	events = require('events'),
 	fs = require('fs'),
+	exec = require('child_process').exec,
 	util = require("util");
 
 var app = module.exports = express.createServer();
@@ -86,10 +87,17 @@ var io = require('socket.io').listen(app);
 io.set('log level', 1);
 io.sockets.on('connection', function(socket) {
 	cout('CONNECTED');
-	var callback = function(msg) {
-		socket.emit('message', msg);
+	var cb = function(tag) {
+		return function(msg) {
+			socket.emit(tag, msg);
+		};
 	};
-	watcher.on('message', callback);
+	var msgcb = cb('message');
+	var outcb = cb('stdout');
+	var errcb = cb('stderr');
+	watcher.on('message', msgcb);
+	watcher.on('stdout', outcb);
+	watcher.on('stderr', errcb);
 
 	socket.on('message', function(msg) {
 		//@@
@@ -98,7 +106,9 @@ io.sockets.on('connection', function(socket) {
 
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
-		watcher.removeListener('message', callback);
+		watcher.removeListener('message', msgcb);
+		watcher.removeListener('stdout', outcb);
+		watcher.removeListener('stderr', errcb);
 	});
 });
 
@@ -137,5 +147,14 @@ process.on('uncaughtException', function(err) {
 
 watcher.on('modified', function(file) {
 	cout('modified', file);
+
+	var child = exec('g++ ' + file, function(err, stdout, stderr) {
+		if (stdout) {
+			watcher.emit('stdout', stdout);
+		}
+		if (stderr) {
+			watcher.emit('stderr', stderr);
+		}
+	});
 });
 

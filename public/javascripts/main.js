@@ -163,14 +163,24 @@ $(function() {
 	var callback = function(msg) {
 		cout('R:' + msg);
 	};
+	var outcb = function(msg) {
+		cout('stdout:' + msg);
+	};
+	var errcb = function(msg) {
+		cout('stderr:' + msg);
+	};
 	socket = io.connect();
 	socket.on('connect', function() {
 		cout('CONNECTED');
 		socket.on('message', callback);
+		socket.on('stdout', outcb);
+		socket.on('stderr', errcb);
 	});
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
 		socket.removeListener('message', callback);
+		socket.removeListener('stdout', outcb);
+		socket.removeListener('stderr', errcb);
 	});
 });
 
