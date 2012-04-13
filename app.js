@@ -98,3 +98,7 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 	round = require('./round')({app:app, config:config});
 });
 
+process.on('uncaughtException', function(err) {
+	cout('uncaught Exception', err);
+});
+
