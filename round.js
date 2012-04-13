@@ -241,8 +241,8 @@ function download_srm_problem_id(round, callback) {
 			content.body.match(/a href="[^"]+[^>]+[^<]+/ig).map(function(val) {
 				if (val.match(/problem_statement.*pm=(\d+).*>(.*)/)) {
 					var pm = RegExp.$1;
-					var title = RegExp.$2;
-					problems.push({pm:pm, title:title});
+					var class_name = RegExp.$2;
+					problems.push({pm:pm, cn:class_name});
 				}
 			});
 		}
@@ -294,14 +294,14 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 
 	var path = srm_problem_path(round_id, problem_id);
 	mkdir(path);
-	var title = problem['title'];
-	path += title;
+	var class_name = problem['cn'];
+	path += class_name;
 
 	cout("round", round_id, "problem", problem, "path", path);
 
 	fs.readFile(path + statement_ext, 'utf8', function(err, html) {
 		if (!err) {
-			callback(null, {path:path, statement:html});
+			callback(null, {path:path, statement:html, index:i});
 			return;
 		}
 
@@ -309,58 +309,12 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 		cout("url", target_url);
 
 		download(target_url, null, function(err, content) {
-			if (!err) {
+			if (!err && content) {
 				var statement = '<html><body>\n' + trim_statement(content.body) + '</body></html>\n';
 				fs.writeFile(path + statement_ext, statement, function(err) { });
 			}
-			callback(err, {path:path, statement:content.body});
+			callback(err, {path:path, statement:content.body, index:i});
 		});
-	});
-}
-
-function get_problem(req, res) {
-	var params = req.method == "POST" ? req.body : req.query;
-	var round_id = parseInt(params['round']);
-	var problem_id = parseInt(params['problem']);
-
-	if (!round_id || !problem_id) {
-		res.json({statusCode:0});
-		return;
-	}
-
-	download_srm_problem_statement(round_id, problem_id, function(err, data) {
-		if (err) {
-//			res.json({statusCode:0});
-			res.send(JSON.stringify({statusCode:0}));
-		} else {
-			var code_filename = data.path + problem.ext();
-			fs.readFile(code_filename, 'utf8', function(err, code) {
-				if (err) {
-					cout("generating code", code_filename);
-					problem.statement_to_code(code_filename, data.statement, function(err, content) {
-
-					
-					
-					});
-
-/*
-					if (os.platform() == 'win32') {
-						// open folder on Windows
-						a.pop();
-						path = a.join('\\');
-						var child = exec('start ' + path);
-					}
-*/
-				}
-			});
-
-			var path = data.path;
-			var a = path.split('/');
-			a.shift();
-			path = a.join('/');
-//			res.json({statusCode:1, path:path});
-			res.send(JSON.stringify({statusCode:1, path:path}));
-		}
 	});
 }
 
@@ -388,6 +342,50 @@ function get_round(req, res) {
 			}
 		});
 	}
+}
+
+function get_problem(req, res) {
+	var params = req.method == "POST" ? req.body : req.query;
+	var round_id = parseInt(params['round']);
+	var problem_id = parseInt(params['problem']);
+
+	if (!round_id || !problem_id) {
+		res.json({statusCode:0});
+		return;
+	}
+
+	download_srm_problem_statement(round_id, problem_id, function(err, data) {
+		if (err) {
+//			res.json({statusCode:0});
+			res.send(JSON.stringify({statusCode:0}));
+		} else {
+			var code_filename = data.path + problem.ext();
+			fs.readFile(code_filename, 'utf8', function(err, code) {
+				if (err) {
+					cout("generating code", code_filename);
+					problem.statement_to_code(code_filename, data.statement, function(err, content) {
+						if (!err) {
+							srm_problems[round_id][data.index][config.language] = code_filename;
+							fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems), function(err) { });
+/*
+							if (os.platform() == 'win32') {
+								// open folder on Windows
+								var child = exec('start ' + code_filename.split('/').join('\\'));
+							}
+*/
+						}
+					});
+				}
+			});
+
+			var path = data.path;
+			var a = path.split('/');
+			a.shift();
+			path = a.join('/');
+//			res.json({statusCode:1, path:path});
+			res.send(JSON.stringify({statusCode:1, path:path}));
+		}
+	});
 }
 
 module.exports = function(options) {
