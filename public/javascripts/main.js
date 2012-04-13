@@ -3,11 +3,27 @@
 
 var xhr;
 var socket;
+var logs = [];
+var log_lines = 20;
+
+function refresh_logs() {
+	var h = logs.join('<br />');
+	$('#status').html(h);
+}
+
+function add_log(msg) {
+	if (logs.length >= log_lines) {
+		logs.pop();
+	}
+	logs.push(msg);
+	refresh_logs();
+}
 
 function console_log(msg) {
 	if (typeof console != 'undefined') {
 	    console.log(msg);
 	}
+	add_log(msg);
 }
 
 cout = function() {
@@ -84,7 +100,7 @@ function gen_problems_table(round, data) {
 	for (var i = 0; i < data.length; ++i) {
 		div += '<tr>';
 		div += '<td>' + levels[i] + '</td>';
-		div += '<td><a href="javascript:on_click_problem(' + round + ', ' + data[i].pm + ')">' + data[i].title + '</a></td>';
+		div += '<td><a href="javascript:on_click_problem(' + round + ', ' + data[i].pm + ')">' + data[i].cn + '</a></td>';
 		div += '</tr>';
 	}
 	div += '</table>';
