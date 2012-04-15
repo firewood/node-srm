@@ -321,21 +321,25 @@ function download_srm_problem_statement(round_id, problem_id, callback) {
 
 
 			target_url = problem_detail_url + '&pm=' + problem_id + '&rd=' + round_id;
+			cout("downloading problem detail...");
 			download(target_url, null, function(err, content) {
 				if (!err && content) {
 					if (content.body.match(/problem_solution[&;a-z]+cr=(\d+)[&;=\w]+"/)) {
 						var cr = RegExp.$1;
 						target_url = problem_solution_url + '&cr=' + cr + '&rd=' + round_id + '&pm=' + problem_id;
+						cout("downloading system test results...");
 						download(target_url, null, function(err, content) {
 							if (!err && content) {
 								var c = content.body.split('</TR>').filter(function(element, index, array) {
 									return element.match(/>Passed</);
 								}).map(function(val) {
-									return val.split('</TD>').filter(function(element, index, array) {
+									var a = val.split('</TD>').filter(function(element, index, array) {
 										return element.match(/statText/);
 									}).map(function(val) {
-										return val.replace(/\n/g, '').replace(/^.*>/, '');
-									}).slice(0, 2);
+										return val.replace(/^[\n\s]+<TD.*">/, '');
+									});
+									var arg = a[0].split(',\n');
+									return [a[1], arg];
 								});
 								fs.writeFile(path + '.json', JSON.stringify(c), function(err) { });
 							}
