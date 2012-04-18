@@ -5,6 +5,16 @@ var xhr;
 var socket;
 var logs = [];
 var log_lines = 20;
+var current_round;
+
+var levels = [
+	'Division I Level One (Easy)',
+	'Division I Level Two (Medium)',
+	'Division I Level Three (Hard)',
+	'Division II Level One (Easy)',
+	'Division II Level Two (Medium)',
+	'Division II Level Three (Hard)',
+];
 
 function refresh_logs() {
 	var h = logs.join('<br />');
@@ -67,19 +77,23 @@ function ajax(url, callback) {
 	}
 }
 
-function on_click_problem(round, problem) {
+function toggle_rounds() {
+	$("#rounds").slideToggle("normal");
+}
 
+function toggle_problems() {
+	$("#problems").slideToggle("normal");
+}
 
-	cout("round", round, "problem", problem);
-
-
-	ajax('/getProblem?round=' + round + '&problem=' + problem, function(err, response) {
+function systemtest(round_id, problem_id) {
+	cout('Running system tests: ' + round_id + ', problem: ' + problem_id);
+	ajax('/runSystemTests?round=' + round_id + '&problem=' + problem_id, function(err, response) {
 		if (err) {
-			$('#problems').html(err);
+			cout(err);
 		} else {
 			try {
-				div = banner + '<div>' + gen_problems_table(id, response.body) + '</div>';
-				$('#problems').html(div);
+				cout('DONE');
+
 			} catch (e) {
 
 			}
@@ -87,20 +101,37 @@ function on_click_problem(round, problem) {
 	});
 }
 
-function gen_problems_table(round, data) {
-	var levels = [
-		'Division I Level One (Easy)',
-		'Division I Level Two (Medium)',
-		'Division I Level Three (Hard)',
-		'Division II Level One (Easy)',
-		'Division II Level Two (Medium)',
-		'Division II Level Three (Hard)',
-	];
+function start_solving(round_id, index) {
+	var div = '<div>' + levels[index] + ', ' + current_round[index].cn + '</div>';
+	div += '<div>[ <a href="javascript:systemtest(' + round_id + ', ' + current_round[index].pm + ');">Submit &amp; Run system tests</a> ]</div>';
+	$('#solving').html(div);
+}
+
+function on_click_problem(round_id, index) {
+	toggle_problems();
+	var problem_id = current_round[index].pm;
+	cout("Fetching round: " + round_id + ", problem: " + problem_id);
+	ajax('/getProblem?round=' + round_id + '&problem=' + problem_id, function(err, response) {
+		if (err) {
+			$('#solving').html('<div>' + err + '</div>');
+		} else {
+			try {
+				cout("Done.");
+				start_solving(round_id, index);
+			} catch (e) {
+
+			}
+		}
+	});
+}
+
+function gen_problems_table(round_id, data) {
+	current_round = data;
 	var div = '<table>';
 	for (var i = 0; i < data.length; ++i) {
 		div += '<tr>';
 		div += '<td>' + levels[i] + '</td>';
-		div += '<td><a href="javascript:on_click_problem(' + round + ', ' + data[i].pm + ')">' + data[i].cn + '</a></td>';
+		div += '<td><a href="javascript:on_click_problem(' + round_id + ', ' + i + ')">' + data[i].cn + '</a></td>';
 		div += '</tr>';
 	}
 	div += '</table>';
@@ -113,7 +144,7 @@ function on_click_round(id, caption) {
 	$('#problems').html(div);
 	ajax('/getRound?round=' + id, function(err, response) {
 		if (err) {
-			$('#problems').html(err);
+			$('#problems').html('<div>' + err + '</div>');
 		} else {
 			try {
 				div = banner + '<div>' + gen_problems_table(id, response.body) + '</div>';
@@ -152,6 +183,7 @@ $(function() {
 					var selected = event.target.options[event.target.selectedIndex];
 					var id = selected.value;
 					var caption = selected.text.substr(1);
+					toggle_rounds();
 					on_click_round(id, caption);
 				});
 			} catch (e) {
@@ -178,9 +210,9 @@ $(function() {
 	});
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
-		socket.removeListener('message', callback);
-		socket.removeListener('stdout', outcb);
-		socket.removeListener('stderr', errcb);
+		socket.removeAllListeners('message');
+		socket.removeAllListeners('stdout');
+		socket.removeAllListeners('stderr');
 	});
 });
 
