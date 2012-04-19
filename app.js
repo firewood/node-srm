@@ -148,8 +148,18 @@ watcher.on('modified', function(file) {
 			watcher.emit('stdout', stdout);
 		}
 		if (stderr) {
-			watcher.emit('stderr', stderr);
+			var lines = stderr.split('\n');
+			var i;
+			for (i = 0; i < lines.length; ++i) {
+				var l = lines[i].trim();
+				if (l) {
+					watcher.emit('stderr', l);
+				}
+			}
 		}
+	});
+	child.on('exit', function() {
+		watcher.emit('stdout', 'done');
 	});
 });
 
