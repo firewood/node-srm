@@ -140,15 +140,10 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 	round = require('./round')({app:app, config:config, watcher:watcher});
 });
 
-process.on('uncaughtException', function(err) {
-	cout('uncaught Exception', err);
-	console.dir(err);
-});
-
 watcher.on('modified', function(file) {
 	cout('modified', file);
 
-	var child = exec('g++ ' + file, function(err, stdout, stderr) {
+	var child = exec('g++ ' + file + ' -o ' + file.replace('.cpp', ''), function(err, stdout, stderr) {
 		if (stdout) {
 			watcher.emit('stdout', stdout);
 		}
@@ -157,4 +152,11 @@ watcher.on('modified', function(file) {
 		}
 	});
 });
+
+/*
+process.on('uncaughtException', function(err) {
+	cout('uncaught Exception', err);
+	console.dir(err);
+});
+*/
 
