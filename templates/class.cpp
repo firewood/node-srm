@@ -13,10 +13,6 @@
 
 using namespace std;
 
-typedef long long LL;
-typedef vector<int> IntVec;
-typedef vector<string> StrVec;
-
 class $CLASSNAME$ {
 
 public:
@@ -56,6 +52,17 @@ template<typename T> vector<T> parse_array(const string &s, int &pos) {
 	}
 	if (pos < s.length() && s[pos] == '\"' && q) ++pos;
 	return v;
+}
+template<typename T> void output(const T &x) { cout << x; }
+void output(const string x) { cout << "\"" << x << "\""; }
+template<typename T> void output_array(const vector<T> &res) {
+	typename vector<T>::const_iterator it;
+	cout << "{";
+	for (it = res.begin(); it != res.end(); ++it) {
+		if (it != res.begin()) cout << ", ";
+		output(*it);
+	}
+	cout << "}" << endl;
 }
 // END CUT HERE
 $TESTCODE$

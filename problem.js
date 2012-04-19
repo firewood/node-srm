@@ -71,7 +71,11 @@ function statement_to_code(path, statement, callback) {
 		argvars.push(a);
 	}
 	test_code += '		$RC$ res = $METHODNAME$(' + argvars.join(', ') + ');\n';
-	test_code += '		cout << res << endl;\n';
+	if (params['RC'].match(/(\w+)\[\]/)) {
+		test_code += '		output_array<' + RegExp.$1 + '>(res);\n';
+	} else {
+		test_code += '		output(res);\n';
+	}
 	test_code += '	}\n';
 	test_code += '// END CUT HERE\n';
 
