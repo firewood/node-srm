@@ -1,12 +1,13 @@
 
 var cout = console.out;
 
+var async = require('async');
 var url = require('url');
 var http = require('http');
 var https = require('https');
 var fs = require('fs');
 var os = require('os');
-var exec = require('child_process').exec;
+var spawn = require('child_process').spawn;
 var querystring = require('querystring');
 var xml = require('./xml');
 
@@ -29,6 +30,7 @@ var config;
 var watcher;
 var problem;
 var cookie;
+var child;
 
 function mkdir(path) {
 	var a = path.split('/');
@@ -373,7 +375,11 @@ function get_round(req, res) {
 				fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems), function(err) { });
 				res.json({statusCode:1, body:srm_problems[round]});
 			} else {
-				res.json({statusCode:0});
+				var error_message = err.toString();
+				if (!err) {
+					error_message = "No content";
+				}
+				res.json({statusCode:0, error_message:error_message});
 			}
 		});
 	}
@@ -425,6 +431,96 @@ function get_problem(req, res) {
 	});
 }
 
+function evaluate(expected, result) {
+	if (result.match(/^[.\d]+$/)) {
+		if (expected.match(/^".*"$/)) {
+			expected = expected.substr(1, expected.length - 2);
+		}
+		return Math.abs(expected - result) <= 0.000000001;
+	}
+	return expected == result;
+}
+
+function invoke(program_path, json) {
+
+//	json = json.slice(0, 5);
+
+	child = spawn(program_path);
+	child.on('exit', function() {
+		cout('Terminated');
+	});
+
+	var tests = json.length;
+	var success = 0;
+	async.forEachSeries(json, function (x, callback) {
+		var expected = x[0];
+		var args = x[1].join(',');
+		child.stdout.on('data', function(data) {
+			child.stdout.removeAllListeners('data');
+			var res = data.toString().trim();
+//			watcher.emit('stdout', 'args: ' + JSON.stringify(args) + ', result: ' + res);
+			if (evaluate(expected, res)) {
+				++success;
+				watcher.emit('stdout', 'PASSED');
+				callback();
+			} else {
+				watcher.emit('stdout', 'Failed: expected ' + expected + ', returned ' + res);
+				callback('FAILED');
+			}
+		});
+		watcher.emit('stdout', 'Testing: ' + args);
+		child.stdin.write(args + '\n');
+	}, function (err, result) {
+		cout("results: " + success + '/' + tests);
+		child.stdout.removeAllListeners('data');
+		child.stdin.end();
+	});
+}
+
+function run_system_tests(req, res) {
+	var params = req.method == "POST" ? req.body : req.query;
+	var round_id = parseInt(params['round']);
+	var problem_id = parseInt(params['problem']);
+	if (!round_id || !problem_id) {
+		res.json({statusCode:0});
+		return;
+	}
+	if (!srm_problems.hasOwnProperty(round_id)) {
+		res.json({statusCode:0});
+		return;
+	}
+	var round = srm_problems[round_id];
+	var problem = null;
+	for (var i = 0; i < round.length; ++i) {
+		if (round[i]['pm'] == problem_id) {
+			problem = round[i];
+			break;
+		}
+	}
+	if (!problem) {
+		res.json({statusCode:0});
+		return;
+	}
+
+	if (problem.hasOwnProperty('c++')) {
+		var source = problem['c++'];
+		var exe = source.replace('.cpp', '');
+		var test_file = source.replace('.cpp', '.json');
+		cout('Testing', exe, "with", test_file);
+		fs.readFile(test_file, 'utf8', function(err, content) {
+			if (err) {
+				res.json({statusCode:0});
+			} else {
+				res.json({statusCode:1});
+				var json = JSON.parse(content);
+				invoke(exe, json);
+			}
+		});
+	} else {
+		res.json({statusCode:0});
+	}
+}
+
 module.exports = function(options) {
 	app = options.app;
 	config = options.config;
@@ -439,5 +535,6 @@ module.exports = function(options) {
 
 	app.get('/getRound', get_round);
 	app.get('/getProblem', get_problem);
+	app.get('/runSystemTests', run_system_tests);
 }
 
