@@ -32,6 +32,7 @@ var express = require('express'),
 var app = module.exports = express.createServer();
 var config;
 var round;
+var problem;
 
 function Watcher() {
 	this.interval = 1000;
@@ -137,7 +138,13 @@ fs.readFile('./config.json', 'utf8', function(err, content) {
 		config['code_gen_path'] = 'public/srm';
 	}
 
-	round = require('./round')({app:app, config:config, watcher:watcher});
+	problem = require('./problem')({app:app, config:config, watcher:watcher});
+	round = require('./round')({app:app, config:config, problem:problem, watcher:watcher});
+	round.init();
+
+	app.get('/getRound', round.get);
+	app.get('/getProblem', problem.get);
+	app.get('/runSystemTests', round.run);
 });
 
 watcher.on('modified', function(file) {
