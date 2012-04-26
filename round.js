@@ -12,7 +12,7 @@ var srm_problem_list_filename = 'public/srm_problems.json';
 
 var app;
 var config;
-var watcher;
+var problem;
 var download;
 var srm_rounds = [];
 var srm_problems = {};
@@ -52,8 +52,12 @@ function extract_srm_round_list(list) {
 	var srm_rounds = [];
 	for (var i = 0; i < list.length; ++i) {
 		var round_name = list[i]['short_name'];
-		if (!round_name.match(/College Tour/) && round_name.match(/SRM ([0-9.]+)/)) {
-			srm_rounds.push({id:list[i]['round_id'], name:round_name});
+		var round_id = list[i]['round_id'];
+		var path = round_id;
+		if (!round_name.match(/College Tour/) && round_name.match(/SRM\s+([\.\d]+)/i)) {
+			path = 'srm_' + RegExp.$1;
+			path = path.replace('.', '_');
+			srm_rounds.push({id:round_id, name:round_name, path:path});
 		}
 	}
 	return srm_rounds;
@@ -85,6 +89,13 @@ function parse_round_xml(data, callback) {
 }
 
 function download_srm_problem_id(round_id, callback) {
+	var path = round_id;
+	for (var i = 0; i < srm_rounds.length; ++i) {
+		if (srm_rounds[i]['id'] == round_id) {
+			path = srm_rounds[i]['path'];
+		}
+	}
+
 	var target_url = round_overview_url + round_id;
 	download.get(target_url, null, function(err, content) {
 		var problems = null;
@@ -94,7 +105,7 @@ function download_srm_problem_id(round_id, callback) {
 				if (val.match(/problem_statement.*pm=(\d+).*>(.*)/)) {
 					var pm = RegExp.$1;
 					var class_name = RegExp.$2;
-					problems.push({pm:pm, cn:class_name});
+					problems.push({pm:pm, cn:class_name, path:path});
 				}
 			});
 		}
@@ -110,6 +121,7 @@ function init() {
 		if (!err) {
 			try {
 				srm_problems = JSON.parse(content);
+				problem.update_list(srm_problems);
 			} catch (e) {
 
 			}
@@ -136,7 +148,8 @@ function get(req, res) {
 		if (!err && problems) {
 			cout("updating problem list...");
 			srm_problems[round_id] = problems;
-			fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems));
+			problem.update_list(srm_problems);
+			fs.writeFile(srm_problem_list_filename, json_stringify(srm_problems));
 			res.json({statusCode:1, body:srm_problems[round_id]});
 		} else {
 			var error_message = err.toString();
@@ -148,14 +161,31 @@ function get(req, res) {
 	});
 }
 
+function run(req, res) {
+	var params = req.method == "POST" ? req.body : req.query;
+	var round_id = parseInt(params['round']);
+	if (!round_id) {
+		var error_message = "Invalid args";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+
+	var error_message = "UNIMPL";
+	res.json({statusCode:0, error_message:error_message});
+
+
+}
+
 module.exports = function(options) {
 	app = options.app;
 	config = options.config;
-	watcher = options.watcher;
+	problem = options.problem;
 	download = require('./download')({app:app, config:config});
 	return {
 		init:init,
 		get:get,
+		run:run,
 	};
 }
 
