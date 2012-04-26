@@ -105,7 +105,7 @@ function try_download(count, target_url, post_data, callback) {
 	req.end();
 }
 
-function download(target_url, post_data, callback) {
+function get(target_url, post_data, callback) {
 	try_download(download_retries, target_url, post_data, callback);
 }
 
@@ -123,7 +123,7 @@ function load(filename, target_url, post_data, converter, callback) {
 			});
 		},
 		function(next) {
-			download(target_url, post_data, next);
+			get(target_url, post_data, next);
 		},
 		function(content, next) {
 			if (content.statusCode != 200) {
@@ -152,6 +152,7 @@ module.exports = function(options) {
 	config = options.config;
 	return {
 		mkdir:mkdir,
+		get:get,
 		load:load,
 	};
 }
