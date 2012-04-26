@@ -5,6 +5,7 @@ var fs = require('fs');
 var xml = require('./xml');
 
 var round_list_url = 'http://community.topcoder.com/tc?module=BasicData&c=dd_round_list';
+var round_overview_url = 'http://community.topcoder.com/stat?c=round_overview&er=0&rd=';
 var round_list_filename = 'public/all_rounds.json';
 var srm_round_list_filename = 'public/srm_rounds.json';
 var srm_problem_list_filename = 'public/srm_problems.json';
@@ -83,9 +84,9 @@ function parse_round_xml(data, callback) {
 	});
 }
 
-function download_srm_problem_id(round, callback) {
-	var target_url = round_overview_url + round;
-	download(target_url, null, function(err, content) {
+function download_srm_problem_id(round_id, callback) {
+	var target_url = round_overview_url + round_id;
+	download.get(target_url, null, function(err, content) {
 		var problems = null;
 		if (!err) {
 			problems = [];
@@ -125,18 +126,18 @@ function get(req, res) {
 		return;
 	}
 
-	if (srm_problems.hasOwnProperty(round)) {
-		cout("cached", srm_problems[round]);
-		res.json({statusCode:1, body:srm_problems[round]});
+	if (srm_problems.hasOwnProperty(round_id)) {
+		cout("cached", srm_problems[round_id]);
+		res.json({statusCode:1, body:srm_problems[round_id]});
 		return;
 	}
 
-	download_srm_problem_id(round, function(err, problems) {
+	download_srm_problem_id(round_id, function(err, problems) {
 		if (!err && problems) {
 			cout("updating problem list...");
-			srm_problems[round] = problems;
+			srm_problems[round_id] = problems;
 			fs.writeFile(srm_problem_list_filename, JSON.stringify(srm_problems));
-			res.json({statusCode:1, body:srm_problems[round]});
+			res.json({statusCode:1, body:srm_problems[round_id]});
 		} else {
 			var error_message = err.toString();
 			if (!err) {
