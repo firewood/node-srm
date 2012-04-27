@@ -54,7 +54,7 @@ template<typename T> vector<T> parse_array(const string &s, int &pos) {
 	return v;
 }
 template<typename T> void output(const T &x) { cout << x; }
-void output(const string x) { cout << "\"" << x << "\""; }
+void output(const string &x) { cout << "\"" << x << "\""; }
 template<typename T> void output_array(const vector<T> &res) {
 	typename vector<T>::const_iterator it;
 	cout << "{";
