@@ -1,8 +1,31 @@
 
 var cout = console.out;
-var fs = require('fs');
+var async = require('async'),
+	fs = require('fs');
+
+var problem_url = 'http://community.topcoder.com/stat?c=problem_statement';
+var problem_detail_url = 'http://community.topcoder.com/tc?module=ProblemDetail';
+var problem_solution_url = 'http://community.topcoder.com/stat?c=problem_solution';
+var statement_ext = '.html';
+var test_argst_ext = '.json';
+
 var app;
 var config;
+var download;
+var watcher;
+var srm_problems = {};
+
+function array_to_json(a) {
+	var j = '[';
+	for (var i = 0; i < a.length; ++i) {
+		if (i > 0) {
+			j += ',\n';
+		}
+		j += JSON.stringify(a[i]);
+	}
+	j += ']\n';
+	return j;
+}
 
 function ext() {
 	var e = '.cpp';
@@ -29,8 +52,28 @@ function array_to_vector(s) {
 	});
 }
 
-function statement_to_code(path, statement, callback) {
-	var r = {'Class:':'CLASSNAME', 'Method:':'METHODNAME', 'Parameters:':'METHODPARMS', 'Returns:':'RC', 'Method signature:':'METHODSIGNATURE'};
+function trim_statement(content) {
+	var f = false;
+	return content.split('\n')
+			.filter(function(element, index, array) {
+		if (element.match(/<!-- BEGIN BODY -->/)) {
+			f = true;
+		}
+		if (element.match(/<!-- END BODY -->/)) {
+			f = false;
+		}
+		return f;
+	}).map(function(element) {
+		if (element.match(/(.*<TABLE)/)) {
+			element = RegExp.$1 + '>';
+		}
+		return element;
+	}).join('\n');
+}
+
+function statement_to_code(filename, statement, callback) {
+	var r = {'Class:':'CLASSNAME', 'Method:':'METHODNAME', 'Parameters:':'METHODPARMS',
+			'Returns:':'RC', 'Method signature:':'METHODSIGNATURE'};
 	var params = {};
 	statement.split('<h3>').map(function(element) {
 		if (element.match(/^Definition/)) {
@@ -97,15 +140,178 @@ function statement_to_code(path, statement, callback) {
 				}
 				return '';
 			});
-			fs.writeFile(path, content, function(err) { });
+			fs.writeFile(filename, content);
 		}
-		callback(err, content);
+		callback(err);
 	});
+}
+
+function download_srm_problem_statement(round_id, problem_id, path, callback) {
+	var statement_filename = path + statement_ext;
+	fs.readFile(statement_filename, 'utf8', function(err, html) {
+		if (!err) {
+			cout("Problem cached", statement_filename);
+			callback(null, html);
+			return;
+		}
+
+		cout("Downloading problem statement...");
+		var target_url = problem_url + '&pm=' + problem_id + '&rd=' + round_id;
+		download.get(target_url, null, function(err, content) {
+			var statement;
+			if (!err && content) {
+				statement = '<html><body>\n' + trim_statement(content.body) + '</body></html>\n';
+				fs.writeFile(statement_filename, statement);
+			}
+			callback(err, statement);
+		});
+	});
+}
+
+function generate_code(path, statement, callback) {
+	var filename = path + ext();
+	fs.readFile(filename, 'utf8', function(err, code) {
+		if (!err) {
+			callback();
+			return;
+		}
+		statement_to_code(filename, statement, callback);
+	});
+}
+
+function download_srm_system_test_results(round_id, problem_id, path, callback) {
+	var filename = path + test_argst_ext;
+	fs.readFile(filename, 'utf8', function(err, data) {
+		if (!err) {
+			json = JSON.parse(data);
+			if (json) {
+				callback();
+				return;
+			}
+		}
+
+		cout("Downloading problem detail...");
+		var target_url = problem_detail_url + '&pm=' + problem_id + '&rd=' + round_id;
+		download.get(target_url, null, function(err, content) {
+			if (err) {
+				callback(err);
+				return;
+			}
+			if (!content) {
+				callback("No content");
+				return;
+			}
+
+			if (!content.body.match(/problem_solution[&;a-z]+cr=(\d+)[&;=\w]+"/)) {
+				callback("No solution");
+				return;
+			}
+
+			cout("Downloading system test results...");
+			var cr = RegExp.$1;
+			target_url = problem_solution_url + '&cr=' + cr + '&rd=' + round_id + '&pm=' + problem_id;
+			download.get(target_url, null, function(err, content) {
+				if (err) {
+					callback(err);
+					return;
+				}
+				if (!content) {
+					callback("No content");
+					return;
+				}
+
+				var c = content.body.split('</TR>').filter(function(element, index, array) {
+					return element.match(/>Passed</);
+				});
+				if (c.length <= 0) {
+					callback("No content");
+					return;
+				}
+
+				c = c.map(function(val) {
+					var a = val.split('</TD>').filter(function(element, index, array) {
+						return element.match(/statText/);
+					}).map(function(val) {
+						return val.replace(/^[\n\s]+<TD.*">/, '');
+					});
+					var arg = a[0].split(',\n');
+					return [a[1], arg];
+				});
+				fs.writeFile(filename, array_to_json(c));
+				callback();
+			});
+		});
+	});
+}
+
+function get(req, res) {
+	var params = req.method == "POST" ? req.body : req.query;
+	var round_id = parseInt(params['round']);
+	var problem_id = parseInt(params['problem']);
+
+	if (!round_id || !problem_id) {
+		var error_message = "Invalid args";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+	if (!srm_problems.hasOwnProperty(round_id)) {
+		var error_message = "Invalid round id";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+	var round = srm_problems[round_id];
+	var problem = null;
+	for (var i = 0; i < round.length; ++i) {
+		if (round[i]['pm'] == problem_id) {
+			problem = round[i];
+			break;
+		}
+	}
+	if (!problem) {
+		var error_message = "Invalid problem id";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+	var path = (config['code_gen_path'] + '/' + problem.path + '/').replace('//', '/');
+	download.mkdir(path);
+	var class_name = problem['cn'];
+	path += class_name;
+	cout("round", round_id, "problem", problem, "path", path);
+
+	async.waterfall([
+		function(next) {
+			download_srm_problem_statement(round_id, problem_id, path, next);
+		},
+		function(statement, next) {
+			generate_code(path, statement, next);
+		},
+		function(next) {
+			var filename = path + ext();
+			setTimeout(function() { watcher.watch(filename); }, 100);
+
+			download_srm_system_test_results(round_id, problem_id, path, next);
+		},
+	], function(err, result) {
+		res.json({statusCode:0});
+	});
+}
+
+function update_list(list) {
+//	cout("SRM problems", list);
+	srm_problems = list;
 }
 
 module.exports = function(options) {
 	app = options.app;
 	config = options.config;
-	return {ext:ext, statement_to_code:statement_to_code};
+	download = require('./download')({app:app, config:config});
+	watcher = options.watcher;
+	return {
+		ext:ext,
+		get:get,
+		update_list:update_list,
+	};
 }
 
