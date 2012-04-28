@@ -1,7 +1,8 @@
 
 var cout = console.out;
 var async = require('async'),
-	fs = require('fs');
+	fs = require('fs'),
+	spawn = require('child_process').spawn;
 
 var problem_url = 'http://community.topcoder.com/stat?c=problem_statement';
 var problem_detail_url = 'http://community.topcoder.com/tc?module=ProblemDetail';
@@ -14,6 +15,11 @@ var config;
 var download;
 var watcher;
 var srm_problems = {};
+
+function update_list(list) {
+//	cout("SRM problems", list);
+	srm_problems = list;
+}
 
 function array_to_json(a) {
 	var j = '[';
@@ -143,6 +149,42 @@ function statement_to_code(filename, statement, callback) {
 			fs.writeFile(filename, content);
 		}
 		callback(err);
+	});
+}
+
+function invoke(program_path, json) {
+
+//	json = json.slice(0, 5);
+
+	child = spawn(program_path);
+	child.on('exit', function() {
+		cout('Terminated');
+	});
+
+	var tests = json.length;
+	var success = 0;
+	async.forEachSeries(json, function (x, callback) {
+		var expected = x[0];
+		var args = x[1].join(',');
+		child.stdout.on('data', function(data) {
+			child.stdout.removeAllListeners('data');
+			var res = data.toString().trim();
+//			watcher.emit('stdout', 'args: ' + JSON.stringify(args) + ', result: ' + res);
+			if (evaluate(expected, res)) {
+				++success;
+				watcher.emit('stdout', 'PASSED');
+				callback();
+			} else {
+				watcher.emit('stdout', 'Failed: expected ' + expected + ', returned ' + res);
+				callback('FAILED');
+			}
+		});
+		watcher.emit('stdout', 'Testing: ' + args);
+		child.stdin.write(args + '\n');
+	}, function (err, result) {
+		cout("results: " + success + '/' + tests);
+		child.stdout.removeAllListeners('data');
+		child.stdin.end();
 	});
 }
 
@@ -298,9 +340,51 @@ function get(req, res) {
 	});
 }
 
-function update_list(list) {
-//	cout("SRM problems", list);
-	srm_problems = list;
+function run(req, res) {
+	var params = req.method == "POST" ? req.body : req.query;
+	var round_id = parseInt(params['round']);
+	var problem_id = parseInt(params['problem']);
+
+	if (!round_id || !problem_id) {
+		var error_message = "Invalid args";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+	if (!srm_problems.hasOwnProperty(round_id)) {
+		var error_message = "Invalid round id";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+	var round = srm_problems[round_id];
+	var problem = null;
+	for (var i = 0; i < round.length; ++i) {
+		if (round[i]['pm'] == problem_id) {
+			problem = round[i];
+			break;
+		}
+	}
+	if (!problem) {
+		var error_message = "Invalid problem id";
+		res.json({statusCode:0, error_message:error_message});
+		return;
+	}
+
+	var path = (config['code_gen_path'] + '/' + problem.path + '/').replace('//', '/');
+	var filename = path + problem.cn + test_argst_ext;
+	fs.readFile(filename, 'utf8', function(err, data) {
+		if (err) {
+			var error_message = "Test case not found";
+			res.json({statusCode:0, error_message:error_message});
+			return;
+		}
+
+		var exe = filename.replace('.cpp', '');
+		var json = JSON.parse(data);
+		invoke(exe, json);
+		res.json({statusCode:1, total:json.length});
+	});
 }
 
 module.exports = function(options) {
@@ -311,6 +395,7 @@ module.exports = function(options) {
 	return {
 		ext:ext,
 		get:get,
+		run:run,
 		update_list:update_list,
 	};
 }
