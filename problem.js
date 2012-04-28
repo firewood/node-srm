@@ -152,10 +152,17 @@ function statement_to_code(filename, statement, callback) {
 	});
 }
 
+function evaluate(expected, result) {
+	if (result.match(/^[.\d]+$/)) {
+		if (expected.match(/^".*"$/)) {
+			expected = expected.substr(1, expected.length - 2);
+		}
+		return Math.abs(expected - result) <= 0.000000001;
+	}
+	return expected == result;
+}
+
 function invoke(program_path, json) {
-
-//	json = json.slice(0, 5);
-
 	child = spawn(program_path);
 	child.on('exit', function() {
 		cout('Terminated');
@@ -172,17 +179,21 @@ function invoke(program_path, json) {
 //			watcher.emit('stdout', 'args: ' + JSON.stringify(args) + ', result: ' + res);
 			if (evaluate(expected, res)) {
 				++success;
-				watcher.emit('stdout', 'PASSED');
+				watcher.emit('systest', JSON.stringify({code:1, res:res}));
 				callback();
 			} else {
-				watcher.emit('stdout', 'Failed: expected ' + expected + ', returned ' + res);
+				watcher.emit('systest', JSON.stringify({code:0, res:res}));
 				callback('FAILED');
 			}
 		});
-		watcher.emit('stdout', 'Testing: ' + args);
-		child.stdin.write(args + '\n');
+//		watcher.emit('stdout', 'Testing: ' + args);
+//		child.stdin.write(args + '\n');
+		setTimeout(function() { child.stdin.write(args + '\n'); }, 10);
 	}, function (err, result) {
-		cout("results: " + success + '/' + tests);
+		var msg = "results: " + success + '/' + tests;
+		cout(msg);
+		watcher.emit('stdout', msg);
+
 		child.stdout.removeAllListeners('data');
 		child.stdin.end();
 	});
@@ -380,7 +391,7 @@ function run(req, res) {
 			return;
 		}
 
-		var exe = filename.replace('.cpp', '');
+		var exe = filename.replace(test_argst_ext, '');
 		var json = JSON.parse(data);
 		invoke(exe, json);
 		res.json({statusCode:1, total:json.length});
