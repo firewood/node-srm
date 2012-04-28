@@ -139,7 +139,7 @@ function get(req, res) {
 	}
 
 	if (srm_problems.hasOwnProperty(round_id)) {
-		cout("cached", srm_problems[round_id]);
+//		cout("cached", srm_problems[round_id]);
 		res.json({statusCode:1, body:srm_problems[round_id]});
 		return;
 	}
@@ -162,19 +162,7 @@ function get(req, res) {
 }
 
 function run(req, res) {
-	var params = req.method == "POST" ? req.body : req.query;
-	var round_id = parseInt(params['round']);
-	if (!round_id) {
-		var error_message = "Invalid args";
-		res.json({statusCode:0, error_message:error_message});
-		return;
-	}
-
-
-	var error_message = "UNIMPL";
-	res.json({statusCode:0, error_message:error_message});
-
-
+	problem.run(req, res);
 }
 
 module.exports = function(options) {
