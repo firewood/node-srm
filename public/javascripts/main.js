@@ -6,6 +6,9 @@ var socket;
 var logs = [];
 var log_lines = 20;
 var current_round;
+var progressbar;
+var total;
+var passed;
 
 var levels = [
 	'Division I Level One (Easy)',
@@ -86,14 +89,15 @@ function toggle_problems() {
 }
 
 function systemtest(round_id, problem_id) {
+	total = 0;
+	passed = 0;
 	cout('Running system tests: ' + round_id + ', problem: ' + problem_id);
 	ajax('/runSystemTests?round=' + round_id + '&problem=' + problem_id, function(err, response) {
 		if (err) {
 			cout(err);
 		} else {
 			try {
-				cout('DONE');
-
+				total = response.total;
 			} catch (e) {
 
 			}
@@ -207,12 +211,22 @@ $(function() {
 		socket.on('message', callback);
 		socket.on('stdout', outcb);
 		socket.on('stderr', errcb);
+		socket.on('systest', function(json) {
+			var msg = JSON.parse(json);
+			if (msg.code) {
+				passed += 1;
+				progressbar.reportprogress(passed, total, passed + " / " + total);
+			}
+		});
 	});
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
 		socket.removeAllListeners('message');
 		socket.removeAllListeners('stdout');
 		socket.removeAllListeners('stderr');
+		socket.removeAllListeners('systest');
 	});
+
+	progressbar = $("#progressbar");
 });
 
