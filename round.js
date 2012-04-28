@@ -65,6 +65,7 @@ function extract_srm_round_list(list) {
 
 function parse_round_xml(data, callback) {
 	cout("Converting round list xml...");
+	var content = [];
 	xml.xml2json(data, function(err, nodes) {
 		var list = null;
 		if (!err) {
@@ -74,16 +75,16 @@ function parse_round_xml(data, callback) {
 			} else {
 				fs.writeFile(round_list_filename, json_stringify(list));
 				list = extract_srm_round_list(list);
-				srm_rounds = list;
-				fs.writeFile(srm_round_list_filename, json_stringify(list));
 				cout("Number of SRM rounds: " + list.length);
+				content = json_stringify(list);
+				fs.writeFile(srm_round_list_filename, content);
 			}
 		}
 		if (err) {
 			cout(err);
 		}
 		if (callback) {
-			callback(err, list);
+			callback(err, content);
 		}
 	});
 }
@@ -116,7 +117,9 @@ function download_srm_problem_id(round_id, callback) {
 }
 
 function init() {
-	download.load(srm_round_list_filename, round_list_url, null, parse_round_xml, null);
+	download.load(srm_round_list_filename, round_list_url, null, parse_round_xml, function(err, content) {
+		srm_rounds = JSON.parse(content);
+	});
 	fs.readFile(srm_problem_list_filename, 'utf8', function(err, content) {
 		if (!err) {
 			try {
