@@ -99,6 +99,7 @@ io.sockets.on('connection', function(socket) {
 	watcher.on('message', msgcb);
 	watcher.on('stdout', outcb);
 	watcher.on('stderr', errcb);
+	watcher.on('systest', cb('systest'));
 
 	socket.on('message', function(msg) {
 		//@@
@@ -107,9 +108,11 @@ io.sockets.on('connection', function(socket) {
 
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
-		watcher.removeListener('message', msgcb);
-		watcher.removeListener('stdout', outcb);
-		watcher.removeListener('stderr', errcb);
+		socket.removeAllListeners('message');
+		watcher.removeAllListeners('message');
+		watcher.removeAllListeners('stdout');
+		watcher.removeAllListeners('stderr');
+		watcher.removeAllListeners('systest');
 	});
 });
 
