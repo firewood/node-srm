@@ -90,7 +90,7 @@ function statement_to_code(filename, statement, callback) {
 					if (r.hasOwnProperty(key)) {
 						key = r[key];
 					}
-					params[key] = a[1];
+					params[key] = a[1].replace(/String/g, 'string');
 				}
 			});
 		}
@@ -105,8 +105,7 @@ function statement_to_code(filename, statement, callback) {
 	var argvars = [];
 
 	var i;
-	var test_code = '// BEGIN CUT HERE\n';
-	test_code += '	void run_test(string s) {\n';
+	var test_code = '\n';
 	test_code += '		int pos = 0;\n';
 	for (i = 0; i < argtypes.length; ++i) {
 		var a = 'a' + i;
@@ -125,8 +124,7 @@ function statement_to_code(filename, statement, callback) {
 	} else {
 		test_code += '		output(res);\n';
 	}
-	test_code += '	}\n';
-	test_code += '// END CUT HERE\n';
+	test_code += '		cout << endl;\n';
 
 	if (params.hasOwnProperty('METHODSIGNATURE')) {
 		var args = params['METHODSIGNATURE'].replace(params['RC'] + ' ' + params['METHODNAME'], '');
@@ -163,38 +161,53 @@ function evaluate(expected, result) {
 }
 
 function invoke(program_path, json) {
+	var data_cb;
 	child = spawn(program_path);
 	child.on('exit', function() {
 		cout('Terminated');
+		data_cb = null;
+		child.stdout.removeAllListeners('data');
+	});
+	child.stdout.on('data', function(data) {
+		setTimeout(function() {
+			if (data_cb) {
+				data_cb(data);
+			}
+		}, 10);
 	});
 
 	var tests = json.length;
 	var success = 0;
 	async.forEachSeries(json, function (x, callback) {
+		if (!child.stdin.writable) {
+			callback("stdin not writable");
+			return;
+		}
+
 		var expected = x[0];
 		var args = x[1].join(',');
-		child.stdout.on('data', function(data) {
-			child.stdout.removeAllListeners('data');
+		data_cb = function(data) {
 			var res = data.toString().trim();
+//			cout('args: ' + args + ', result: ' + res);
 //			watcher.emit('stdout', 'args: ' + JSON.stringify(args) + ', result: ' + res);
 			if (evaluate(expected, res)) {
 				++success;
-				watcher.emit('systest', JSON.stringify({code:1, res:res}));
+				watcher.emit('systest', JSON.stringify({code:1, args:args, expected:expected, result:res}));
 				callback();
 			} else {
-				watcher.emit('systest', JSON.stringify({code:0, res:res}));
+				watcher.emit('systest', JSON.stringify({code:0, args:args, expected:expected, result:res}));
 				callback('FAILED');
 			}
-		});
+		};
+		cout('Testing: ' + args);
 //		watcher.emit('stdout', 'Testing: ' + args);
-//		child.stdin.write(args + '\n');
-		setTimeout(function() { child.stdin.write(args + '\n'); }, 10);
+		child.stdin.write(args + '\n');
 	}, function (err, result) {
+		data_cb = null;
 		var msg = "results: " + success + '/' + tests;
 		cout(msg);
 		watcher.emit('stdout', msg);
 
-		child.stdout.removeAllListeners('data');
 		child.stdin.end();
 	});
 }
@@ -255,6 +268,9 @@ function download_srm_system_test_results(round_id, problem_id, path, callback) 
 				return;
 			}
 
+			//@@ debug
+			fs.writeFile(path + "_detail.html", content.body);
+
 			if (!content.body.match(/problem_solution[&;a-z]+cr=(\d+)[&;=\w]+"/)) {
 				callback("No solution");
 				return;
@@ -272,6 +288,9 @@ function download_srm_system_test_results(round_id, problem_id, path, callback) 
 					callback("No content");
 					return;
 				}
+
+				//@@ debug
+				fs.writeFile(path + "_solution.html", content.body);
 
 				var c = content.body.split('</TR>').filter(function(element, index, array) {
 					return element.match(/>Passed</);
