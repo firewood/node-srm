@@ -93,26 +93,18 @@ io.sockets.on('connection', function(socket) {
 			socket.emit(tag, msg);
 		};
 	};
-	var msgcb = cb('message');
 	var outcb = cb('stdout');
 	var errcb = cb('stderr');
-	watcher.on('message', msgcb);
+	var syscb = cb('systest');
 	watcher.on('stdout', outcb);
 	watcher.on('stderr', errcb);
-	watcher.on('systest', cb('systest'));
-
-	socket.on('message', function(msg) {
-		//@@
-		cout('MSG', msg);
-	});
+	watcher.on('systest', syscb);
 
 	socket.on('disconnect', function() {
 		cout('DISCONNECTED');
-		socket.removeAllListeners('message');
-		watcher.removeAllListeners('message');
-		watcher.removeAllListeners('stdout');
-		watcher.removeAllListeners('stderr');
-		watcher.removeAllListeners('systest');
+		watcher.removeListener('stdout', outcb);
+		watcher.removeListener('stderr', errcb);
+		watcher.removeListener('systest', syscb);
 	});
 });
 
@@ -157,8 +149,15 @@ watcher.on('modified', function(file) {
 		if (stdout) {
 			watcher.emit('stdout', stdout);
 		}
+		var errmsg = '';
+		if (err) {
+			errmsg += err.toString();
+		}
 		if (stderr) {
-			var lines = stderr.split('\n');
+			errmsg += stderr.toString();
+		}
+		if (errmsg) {
+			var lines = errmsg.split('\n');
 			var i;
 			for (i = 0; i < lines.length; ++i) {
 				var l = lines[i].trim();
@@ -169,7 +168,7 @@ watcher.on('modified', function(file) {
 		}
 	});
 	child.on('exit', function() {
-		watcher.emit('stdout', 'done');
+		watcher.emit('stdout', 'Build done');
 	});
 });
 
