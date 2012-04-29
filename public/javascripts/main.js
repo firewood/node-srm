@@ -91,17 +91,27 @@ function toggle_problems() {
 function systemtest(round_id, problem_id) {
 	total = 0;
 	passed = 0;
-	cout('Running system tests: ' + round_id + ', problem: ' + problem_id);
+//	cout('Running system tests: ' + round_id + ', problem: ' + problem_id);
 	ajax('/runSystemTests?round=' + round_id + '&problem=' + problem_id, function(err, response) {
-		if (err) {
-			cout(err);
-		} else {
-			try {
-				total = response.total;
-			} catch (e) {
-
+		var error_message;
+		try {
+			if (err) {
+				error_message = err.toString();
+			} else {
+				if (response.statusCode) {
+					total = response.total;
+					cout('Running system tests: ' + round_id + ', problem: ' + problem_id + ", " + total + " tests");
+					return;
+				}
+				error_message = response.error_message;
 			}
+			if (!error_message) {
+				error_message = "Unknown error";
+			}
+		} catch (e) {
+
 		}
+		cout(error_message);
 	});
 }
 
@@ -196,26 +206,21 @@ $(function() {
 		}
 	});
 
-	var callback = function(msg) {
-		cout('R:' + msg);
-	};
-	var outcb = function(msg) {
-		cout('stdout:' + msg);
-	};
-	var errcb = function(msg) {
-		cout('stderr:' + msg);
-	};
 	socket = io.connect();
 	socket.on('connect', function() {
 		cout('CONNECTED');
-		socket.on('message', callback);
-		socket.on('stdout', outcb);
-		socket.on('stderr', errcb);
+		socket.on('stdout', function(msg) { cout('CON: ' + msg); });
+		socket.on('stderr', function(msg) { cout('ERR: ' + msg); });
 		socket.on('systest', function(json) {
 			var msg = JSON.parse(json);
 			if (msg.code) {
 				passed += 1;
 				progressbar.reportprogress(passed, total, passed + " / " + total);
+			} else {
+				cout(" arguments: " + msg.args);
+				cout(" expected: " + msg.expected);
+				cout(" result: " + msg.result);
+				cout("Failed System Test");
 			}
 		});
 	});
