@@ -22,7 +22,10 @@ public:
 
 		return result;
 	}
-$WRITERCODE$
+
+	void run_test(string s);
+};
+
 // BEGIN CUT HERE
 template<typename T> T parse(const string &s, int &pos) {
 	T x; if (pos >= s.length()) return x;
@@ -40,6 +43,18 @@ template<typename T> T parse(const string &s, int &pos) {
 	while (pos < s.length() && s[pos] == ' ') ++pos;
 	return x;
 }
+template<> string parse(const string &s, int &pos) {
+	string x; if (pos >= s.length()) return x;
+	size_t len = 0, e;
+	if (s[pos] != '\"') return x;
+	e = s.find('\"', ++pos); if (e == string::npos) return x;
+	len = e - pos;
+	x = s.substr(pos, len);
+	pos += (len + 1);
+	if (pos < s.length() && s[pos] == ',') ++pos;
+	while (pos < s.length() && s[pos] == ' ') ++pos;
+	return x;
+}
 template<typename T> vector<T> parse_array(const string &s, int &pos) {
 	vector<T> v; if (pos >= s.length()) return v;
 	bool q = s[pos] == '\"'; pos += q;
@@ -51,6 +66,8 @@ template<typename T> vector<T> parse_array(const string &s, int &pos) {
 		v.push_back(parse<T>(s, pos));
 	}
 	if (pos < s.length() && s[pos] == '\"' && q) ++pos;
+	if (pos < s.length() && s[pos] == ',') ++pos;
+	while (pos < s.length() && s[pos] == ' ') ++pos;
 	return v;
 }
 template<typename T> void output(const T &x) { cout << x; }
@@ -62,11 +79,10 @@ template<typename T> void output_array(const vector<T> &res) {
 		if (it != res.begin()) cout << ", ";
 		output(*it);
 	}
-	cout << "}" << endl;
+	cout << "}";
 }
-// END CUT HERE
-$TESTCODE$
-};
+
+void $CLASSNAME$::run_test(string s) {$TESTCODE$}
 
 // BEGIN CUT HERE
 int main() {
